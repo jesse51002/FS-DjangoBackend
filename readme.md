@@ -1,7 +1,7 @@
 # Setup
 ```sh
 # clone and cd
-git clone https://github.com/IRVLUTD/OpenVocabX && cd OpenVocabX
+git clone https://github.com/jesse51002/FS-DjangoBackend.git && cd FS-DjangoBackend
 
 # create conda environment
 conda create -n DjangoBackend python=3.12
