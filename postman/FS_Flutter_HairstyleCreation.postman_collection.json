@@ -16,7 +16,7 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n    \"eventid\": \"202312-2703-1444-90213d64-ee1e-4de2-ae1f-68410b80524f\",\r\n    \"hairstyle_id\": 234321,\r\n    \"photo_ids\": {\r\n        \"front\": 0,\r\n        \"right\": 0,\r\n        \"left\": 0,\r\n        \"back\": 0\r\n        }\r\n}",
+					"raw": "{\r\n    \"eventid\": \"202312-2716-4147-2cb6bea2-b0c2-4e4c-ac26-a666cff1fa98\",\r\n    \"hairstyle_id\": 234321,\r\n    \"photo_ids\": {\r\n        \"front\": 0,\r\n        \"right\": 0,\r\n        \"left\": 0,\r\n        \"back\": 0\r\n        }\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -24,7 +24,7 @@
 					}
 				},
 				"url": {
-					"raw": "http://127.0.0.1:8000/hairstyle_creation/rendering/start/?eventid=202312-2703-1444-90213d64-ee1e-4de2-ae1f-68410b80524f",
+					"raw": "http://127.0.0.1:8000/hairstyle_creation/rendering/start/?eventid=202312-2716-4147-2cb6bea2-b0c2-4e4c-ac26-a666cff1fa98",
 					"protocol": "http",
 					"host": [
 						"127",
@@ -43,7 +43,7 @@
 					"query": [
 						{
 							"key": "eventid",
-							"value": "202312-2703-1444-90213d64-ee1e-4de2-ae1f-68410b80524f"
+							"value": "202312-2716-4147-2cb6bea2-b0c2-4e4c-ac26-a666cff1fa98"
 						}
 					]
 				},
@@ -57,7 +57,7 @@
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "http://127.0.0.1:8000/hairstyle_creation/rendering/results/?eventid=202312-2703-1444-90213d64-ee1e-4de2-ae1f-68410b80524f",
+					"raw": "http://127.0.0.1:8000/hairstyle_creation/rendering/results/?eventid=202312-2716-4147-2cb6bea2-b0c2-4e4c-ac26-a666cff1fa98",
 					"protocol": "http",
 					"host": [
 						"127",
@@ -76,7 +76,7 @@
 					"query": [
 						{
 							"key": "eventid",
-							"value": "202312-2703-1444-90213d64-ee1e-4de2-ae1f-68410b80524f"
+							"value": "202312-2716-4147-2cb6bea2-b0c2-4e4c-ac26-a666cff1fa98"
 						}
 					]
 				},
@@ -114,7 +114,7 @@
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "http://127.0.0.1:8000/custom_img/link//?eventid=202312-2703-1444-90213d64-ee1e-4de2-ae1f-68410b80524f",
+					"raw": "http://127.0.0.1:8000/hairstyle_creation/hairstyle_presets/?eventid=202312-2703-1444-90213d64-ee1e-4de2-ae1f-68410b80524f",
 					"protocol": "http",
 					"host": [
 						"127",
@@ -124,9 +124,8 @@
 					],
 					"port": "8000",
 					"path": [
-						"custom_img",
-						"link",
-						"",
+						"hairstyle_creation",
+						"hairstyle_presets",
 						""
 					],
 					"query": [
@@ -146,7 +145,7 @@
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "http://127.0.0.1:8000/hairstyle_creation/custom_img/link/?eventid=202312-2703-1444-90213d64-ee1e-4de2-ae1f-68410b80524f",
+					"raw": "http://127.0.0.1:8000/hairstyle_creation/custom_img/link/?eventid=202312-2716-4147-2cb6bea2-b0c2-4e4c-ac26-a666cff1fa98",
 					"protocol": "http",
 					"host": [
 						"127",
@@ -164,7 +163,7 @@
 					"query": [
 						{
 							"key": "eventid",
-							"value": "202312-2703-1444-90213d64-ee1e-4de2-ae1f-68410b80524f"
+							"value": "202312-2716-4147-2cb6bea2-b0c2-4e4c-ac26-a666cff1fa98"
 						}
 					]
 				},
@@ -178,7 +177,7 @@
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "http://127.0.0.1:8000/hairstyle_creation/custom_img/imageid/?eventid=202312-2703-1444-90213d64-ee1e-4de2-ae1f-68410b80524f",
+					"raw": "http://127.0.0.1:8000/hairstyle_creation/custom_img/imageid/?eventid=202312-2716-4147-2cb6bea2-b0c2-4e4c-ac26-a666cff1fa98",
 					"protocol": "http",
 					"host": [
 						"127",
@@ -196,7 +195,7 @@
 					"query": [
 						{
 							"key": "eventid",
-							"value": "202312-2703-1444-90213d64-ee1e-4de2-ae1f-68410b80524f"
+							"value": "202312-2716-4147-2cb6bea2-b0c2-4e4c-ac26-a666cff1fa98"
 						}
 					]
 				},
