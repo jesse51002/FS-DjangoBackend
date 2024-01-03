@@ -50,7 +50,11 @@ def get_hairstyles_presets(request):
     # Creates a list of links and ids
     hairstyles = []
     for i, link in enumerate(HAIRSTYLE_PRESET_LINKS):
-        hairstyles.append([i, link])
+        hairstyles.append({
+            "hairstlye_id":i, 
+            "hairstyle_url": link
+            }
+            )
     
     # Returns data
     return JsonResponse({"Hairstyles": hairstyles})
