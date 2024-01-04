@@ -1,5 +1,6 @@
 from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse, HttpResponseBadRequest
+from django.views.decorators.csrf import csrf_exempt
 
 from datetime import datetime
 from uuid import uuid4
@@ -113,12 +114,14 @@ def get_custom_hairstyle_id(request):
     
     
 
+
+@csrf_exempt 
 # This returns client custom hairstyle upload link
 # Input: EventID, hairstyleID, Each Photo Direction image url/id
 # Output: Success Bool
 def start_rendering(request):
-    if request.method != "GET":
-        return HttpResponseBadRequest("Must use a GET request")
+    if request.method != "POST":
+        return HttpResponseBadRequest("Must use a POST request")
     
     eventid = request.GET.get('eventid')
     print("EventID: ",eventid)
