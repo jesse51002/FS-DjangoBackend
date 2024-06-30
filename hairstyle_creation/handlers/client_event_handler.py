@@ -1,5 +1,6 @@
 from datetime import datetime
 import typing
+from typing import Optional
 
 from hairstyle_creation.errors import AlreadyExists
 from hairstyle_creation.models import (
@@ -8,31 +9,13 @@ from hairstyle_creation.models import (
     HairstyleChangeEvent,
     BlendInferenceResult,
     create_eventid,
-    database,
-    inference_database
+    write_data,
+    get_event
 )
-
-
-def assert_account_has_event(account_identifier: str, eventid: str):
-    """
-    Asserts that the given account identifier has a change event with the specified event ID.
-
-    Args:
-        account_identifier (str): The identifier of the account.
-        eventid (str): The ID of the change event.
-
-    Returns:
-        None
-
-    Raises:
-        Exception: If the event with the specified ID does not exist.
-        Exception: If the account does not have an event with the specified ID.
-    """
-    if eventid not in database:
-        raise Exception(f"The event with id {eventid} does not exist.")
-    
-    if database[eventid].accout_identifier != account_identifier:
-        raise PermissionError(f"Account {account_identifier} does not have an event with id {eventid}.")
+from hairstyle_creation.handlers.inference_handler import (
+    start_embedding_inference,
+    start_blending_inference
+)
 
 def create_new_hairstyle_event(
     account_identifier: str,
@@ -51,16 +34,18 @@ def create_new_hairstyle_event(
     """
     eventid = create_eventid()
     
-    # Uploads the event to the database
-    database[eventid] = HairstyleChangeEvent(
+    event = HairstyleChangeEvent(
         eventid = eventid,
         account_identifier = account_identifier
     )
-        
+    
+    # Uploads the event to the database
+    write_data(event)
+    
     return eventid
 
 
-def add_hairstyles(account_identifier: str, eventid: str, hairstyles: list[dict[str, typing.Any]]) -> Exception | None:
+def add_hairstyles(account_identifier: str, eventid: str, hairstyles_dict: list[dict[str, typing.Any]]) -> Optional[Exception]:
     """
     Adds hairstyles choices to a change event in the database.
 
@@ -75,24 +60,29 @@ def add_hairstyles(account_identifier: str, eventid: str, hairstyles: list[dict[
     Raises:
         Exception: If the account does not have an event with the provided eventid.
     """
-    try:
-        assert_account_has_event(account_identifier, eventid)
-    except Exception as e:
-        return e
+    event = get_event(eventid, account_identifier)
     
-    if database[eventid].picked_hairstyles_timestamp is not None:
+    if event.picked_hairstyles_timestamp is not None:
         return AlreadyExists("Already picked hairstyles for this event")
     
     hairstyles: list[Hairstyle] = []
     
-    for hairstyle in hairstyles:
-        hairstyles.append(Hairstyle(**hairstyle))
+    for style_dict in hairstyles_dict:
+        hairstyle = Hairstyle(**style_dict)
+        assert hairstyle not in hairstyles
+        hairstyles.append(hairstyle)
     
-    database[eventid].hairstyles = hairstyles
-    database[eventid].picked_hairstyles_timestamp = datetime.now()
+    event.hairstyles = hairstyles
+    event.picked_hairstyles_timestamp = datetime.now()
+    
+    write_data(event)
+    
+    # Starts the blending inference if embedding has finished
+    # If embedding has not finished then blending will start automatically when embedding is finished
+    start_blending_inference(event)
    
  
-def add_uploaded_picture(account_identifier: str, eventid: str, picture: dict[str, typing.Any]) -> Exception | None:
+def add_uploaded_picture(account_identifier: str, eventid: str, picture: dict[str, typing.Any]) -> Optional[Exception]:
     """
     Adds uploaded pictures to a change event in the database.
 
@@ -107,19 +97,21 @@ def add_uploaded_picture(account_identifier: str, eventid: str, picture: dict[st
     Raises:
         Exception: If the account does not have an event with the provided eventid.
     """
-    try:
-        assert_account_has_event(account_identifier, eventid)
-    except Exception as e:
-        return e
+    event = get_event(eventid, account_identifier)
     
-    if database[eventid].uploaded_picture_timestamp is not None:
+    if event.uploaded_picture_timestamp is not None:
         return AlreadyExists("Already uploaded a picture for this event")
-            
-    database[eventid].uploaded_picture = UploadPicture(**picture)
-    database[eventid].uploaded_picture_timestamp = datetime.now()
+    
+    event.uploaded_picture = UploadPicture(**picture)
+    event.uploaded_picture_timestamp = datetime.now()
+    
+    write_data(event)
+    
+    # Starts the embedding event immediately the picture is uploaded to reduce customer waiting time
+    start_embedding_inference(event)
+    
 
-
-def get_results(account_identifier: str, eventid: str) -> Exception | list[BlendInferenceResult] | None:
+def get_results(account_identifier: str, eventid: str) -> list[BlendInferenceResult] | None:
     """
     Get the hair change results for a specific account and event.
 
@@ -128,38 +120,29 @@ def get_results(account_identifier: str, eventid: str) -> Exception | list[Blend
         eventid (str): The unique identifier of the change event.
 
     Returns:
-        TimeoutError: If the event has timed out.
         list[BlendInferenceResult] | None: The list of hair inference results for the event, or None if the event is not finished.
     """
-    try:
-        assert_account_has_event(account_identifier, eventid)
-    except Exception as e:
-        return e
-    
-    event = database[eventid]
-    
-    if datetime.now() > event.event_timeout:
-        handle_timeout(eventid=eventid)
-        return TimeoutError("Event has timed out")
+    event = get_event(eventid, account_identifier)
     
     # If it has not started, return False
     if (event.start_timestamp is None or
-        event.uploaded_picture_timestamp is None or
-        event.picked_hairstyles_timestamp is None or
-        event.embedding_inference_id is None or 
-        event.blend_inference_ids is None):
+        event.uploaded_picture is None or
+        event.hairstyles is None or
+        event.embedding_inference is None or 
+        event.blend_inferences is None):
         return None
     
     blend_results: list[BlendInferenceResult] = []
     
-    for inference_id in event.blend_inference_ids:
-        inference_event = inference_database[inference_id]
-        
+    if len(event.blend_inferences) != len(event.hairstyles):
+        return None
+    
+    for inference_event in event.blend_inferences:
         # If any inference event has not finished, return None because it is not finished
-        if inference_event.finished_timestamp is None:
+        if inference_event.result is None:
             return None
         
-        blend_results.append(inference_event.blending_result)
+        blend_results.append(inference_event.result)
     
     # If all inference events have finished, set the event as finished
     if event.finished_timestamp is not None:
@@ -168,5 +151,3 @@ def get_results(account_identifier: str, eventid: str) -> Exception | list[Blend
     return blend_results
 
 
-def handle_timeout(eventid: str):
-    raise NotImplementedError()

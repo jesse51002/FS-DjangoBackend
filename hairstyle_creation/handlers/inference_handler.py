@@ -1,23 +1,21 @@
 from datetime import datetime
 import typing
-from uuid import uuid4
-
-from pydantic import BaseModel
+from typing import Optional
 
 from hairstyle_creation.errors import AlreadyExists
 from hairstyle_creation.models import (
+    HairstyleChangeEvent,
     InferenceEvent,
     EmbeddingInferenceResult,
     BlendInferenceResult,
     create_eventid,
-    database,
-    inference_database,
+    write_data,
+    get_event
 )
-from hairstyle_creation.handlers.client_event_handler import assert_account_has_event
 from hairstyle_creation.handlers.aws_queue_handler import add_to_embedding_queue, add_to_blending_queue
 
 
-def start_embedding_inference(account_identifier: str, eventid: str) -> Exception | None:
+def start_embedding_inference(event: HairstyleChangeEvent) -> Optional[Exception]:
     """
     Starts the embedding inference process for a given account and event.
 
@@ -26,54 +24,32 @@ def start_embedding_inference(account_identifier: str, eventid: str) -> Exceptio
         eventid (str): The identifier of the event.
 
     Returns:
-        None | AlreadyExists: If the inference process has already started for the event,
-        returns a AlreadyExists. Otherwise, returns None.
+        Optional[Exception]: If the inference process has already started for the event, returns a AlreadyExists
 
     Raises:
-        None
+        KeyError: If there is no uploaded picture to embed
 
-    Adds all the hairstyles to the embedding queue for the given event.
     """
-    try:
-        assert_account_has_event(account_identifier, eventid)
-    except Exception as e:
-        return e
-    
-    event = database[eventid]
-    
+        
     # If embedding has already started
-    if event.embedding_inference_id is not None:
-        embedding_event = inference_database[event.embedding_inference_id]
-        embedding_results = embedding_event.embedding_result
-        # If embedding has finished then start blending
-        if embedding_results is not None:
-            return start_blending_inference(eventid, embedding_results)
-        # Else return AlreadyExists
-        else:
-            return AlreadyExists("Embedding has already started")
+    if event.embedding_inference is not None:
+        raise AlreadyExists("Embedding has already started")
     
     if event.uploaded_picture is None:
-        return ValueError("There is no uploaded picture to Embed")
+        raise KeyError("There is no uploaded picture to Embed")
     
     inference_eventid = create_eventid()
     inference_event = InferenceEvent(
         inference_eventid = inference_eventid,
-        hairchange_eventid = event.eventid,
         type = "Embedding",
-        account_identifier = account_identifier,
-        uploaded_picture = event.uploaded_picture,
-        event_timeout = event.event_timeout
     )
     
-    add_to_embedding_queue(inference_event)
-    inference_database[inference_eventid] = inference_event
-    inference_database[inference_eventid].queue_timestamp = datetime.now()
-    
-    database[eventid].embedding_inference_id = inference_eventid
+    event.embedding_inference = inference_event
+    add_to_embedding_queue(event)
+    write_data(event)
         
-
-
-def post_embed_result(result: dict[str, typing.Any]) -> Exception | None:
+    
+def post_embed_result(result: dict[str, typing.Any]) -> None:
     """
     Update the inference event with the embedding results and start the blending inference if the event has already started.
 
@@ -85,18 +61,29 @@ def post_embed_result(result: dict[str, typing.Any]) -> Exception | None:
     """
     embedding_results = EmbeddingInferenceResult(**result)
     
-    if embedding_results.inference_eventid not in inference_database:
-        return ValueError("Inference event not found")
+    event = get_event(embedding_results.hairchange_eventid)
     
-    inference_event = inference_database[embedding_results.inference_eventid]
+    if event.embedding_inference is None:
+        raise KeyError("Embedding has not started")
     
-    inference_event.embedding_result = embedding_results
-    inference_event.finished_timestamp = datetime.now()
-        
-    started = start_blending_inference(embedding_results.hairchange_eventid, embedding_results)
+    if event.embedding_inference.inference_eventid != embedding_results.inference_eventid:
+        raise KeyError("The hairchange event does not match the embedding inference event")
+    
+    if event.embedding_inference.result is not None:
+        raise AlreadyExists("Embedding results have already been posted")
+    
+    event.embedding_inference.set_result(embedding_results)
+    write_data(event)
+    
+    try:
+        # When embedding is finished trys to start blending
+        # If embedding finished before user has picked hairstyles then user will start blending when they pick hairstyles
+        start_blending_inference(event)
+    except KeyError as e:
+        "Couldn't start blending inference because user hasnt picked hairstyles yet"
 
 
-def start_blending_inference(hairchange_eventid: str, emdedding_results: EmbeddingInferenceResult) -> Exception | bool:
+def start_blending_inference(event: HairstyleChangeEvent) -> Optional[Exception]:
     """
     Start the blending inference process for a given inference event ID.
     
@@ -105,62 +92,46 @@ def start_blending_inference(hairchange_eventid: str, emdedding_results: Embeddi
         emdedding_results (EmbeddingInferenceResult): The embedding results for the inference event.
     
     Raises:
-        AssertionError: If the inference event ID is not found in the database.
+        KeyError: If the hairstyles to blend have not been picked by user yet
     
     Returns:
         starting_inference (bool): Whether the inference process was started or not. (True if started, False if not started())
         or
         AlreadyExists: If the inference process has already started for the hairchange event.
     """
-
-    if hairchange_eventid not in database:
-        return ValueError("Inference event not found")
-    
-    event = database[hairchange_eventid]
     
     # Can not start if the hairstyles have not been picked yet
-    if event.picked_hairstyles_timestamp is None:
-        return False
+    if event.hairstyles is None:
+        raise KeyError("There are no hairstyles to blend")
     
-    if event.blend_inference_ids is None:
-        event.blend_inference_ids = []
-    
-    # Makes sure to not add duplicate hairstyles to the blending queue
-    hairstyles_to_parse = set(event.hairstyles)
-    
-    already_added_hairstyles = set()
-    
-    for blend_inference_id in event.blend_inference_ids:
-        blend_inference_event = inference_database[blend_inference_id]
-        already_added_hairstyles.add(blend_inference_event.hairstyle)
+    if event.embedding_inference is None:
+        raise ValueError("Embedding has not startet yet")
         
-    hairstyles_to_parse = list(hairstyles_to_parse - already_added_hairstyles)
+    if event.embedding_inference.result is None:
+        return Exception("Embedding has not finished yet")
     
-    if len(hairstyles_to_parse) == 0:
-        return AlreadyExists("Already started Blending")
+    if event.blend_inferences is None:
+        event.blend_inferences = []
     
-    for hairstyle in hairstyles_to_parse:
+    # Makes sure that the blending process has not already started
+    for blend_inference_event in event.blend_inferences:
+        blend_hairstyle = blend_inference_event.hairstyle
+        for hairstyle in event.hairstyles:
+            if blend_hairstyle == hairstyle:
+                raise AlreadyExists("Already started Blending")
+        
+    for hairstyle in event.hairstyles:
         inference_eventid = create_eventid()
         inference_event = InferenceEvent(
             inference_eventid = inference_eventid,
-            hairchange_eventid = event.eventid,
             type = "Blending",
-            account_identifier = event.account_identifier,
-            uploaded_picture = event.uploaded_picture,
-            hairstyle = hairstyle,
-            embedding_result = emdedding_results,
-            event_timeout = event.event_timeout
+            hairstyle = hairstyle
         )
-        
-        add_to_blending_queue(inference_event)
-            
-        inference_database[inference_eventid] = inference_event
-        inference_database[inference_eventid].queue_timestamp = datetime.now()   
-        
-        event.blend_inference_ids.append(inference_eventid) 
-        
-    return True
-
+        event.blend_inferences.append(inference_event)
+    
+    add_to_blending_queue(event)        
+    write_data(event)
+    
 
 def post_blend_result(result: dict[str, typing.Any]):
     """
@@ -174,10 +145,32 @@ def post_blend_result(result: dict[str, typing.Any]):
     """
     blending_results = BlendInferenceResult(**result)
     
-    if blending_results.inference_eventid in inference_database:
-        return ValueError("Inference event not found")
+    event = get_event(blending_results.hairchange_eventid)
     
-    inference_event = inference_database[blending_results.inference_eventid]
+    if event.blend_inferences is None:
+        raise KeyError("This hairchange event does not match the blending inference event")
     
-    inference_event.blending_result = blending_results
-    inference_event.finished_timestamp = datetime.now()
+    for blend_inference_event in event.blend_inferences:
+        if blend_inference_event.inference_eventid != blending_results.inference_eventid:
+            continue
+        
+        if blend_inference_event.result is not None:
+            raise AlreadyExists("Blending result have already been posted")
+        
+        blend_inference_event.set_result(blending_results)
+        
+        # Checks if all blending inferences are finished
+        all_done = True
+        for blend_inference_event in event.blend_inferences:
+            if blend_inference_event.result is None:
+                all_done = False
+                break
+        
+        if all_done:
+            event.finished_timestamp = datetime.now()
+        
+        write_data(event)
+        return
+        
+    raise KeyError("This hairchange event does not match the blending inference event")
+    

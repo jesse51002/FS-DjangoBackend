@@ -19,6 +19,11 @@ pip install -r requirements.txt
 python manage.py runserver
 ```
 
+# Running Tests
+```sh
+python manage.py test --pattern="tests_*.py"    
+```
+
 # Code
 Most code is located here:
 https://github.com/jesse51002/FS-DjangoBackend/blob/main/hairstyle_creation/views.py
