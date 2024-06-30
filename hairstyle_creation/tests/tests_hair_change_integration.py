@@ -63,10 +63,7 @@ class HairChangeIntergrationTest(TestCase):
             blend_results["hairchange_eventid"] = event.eventid            
             post_blend_result(blend_results)
             
-        event = get_event(self.event_id, account_identifier=ACCOUNT_IDENTIFIER)
-        
-        results = get_results(account_identifier=ACCOUNT_IDENTIFIER, eventid=self.event_id)
-        
+        results = get_results(account_identifier=ACCOUNT_IDENTIFIER, eventid=self.event_id)    
         self.assertIsInstance(results, list)
         for result in results:
             self.assertIsInstance(result, BlendInferenceResult)
@@ -91,10 +88,7 @@ class HairChangeIntergrationTest(TestCase):
             blend_results["hairchange_eventid"] = event.eventid            
             post_blend_result(blend_results)
             
-        event = get_event(self.event_id, account_identifier=ACCOUNT_IDENTIFIER)
-        
         results = get_results(account_identifier=ACCOUNT_IDENTIFIER, eventid=self.event_id)
-        
         self.assertIsInstance(results, list)
         for result in results:
             self.assertIsInstance(result, BlendInferenceResult)
