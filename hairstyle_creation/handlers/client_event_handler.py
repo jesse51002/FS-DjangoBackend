@@ -2,7 +2,7 @@ from datetime import datetime
 import typing
 from typing import Optional
 
-from hairstyle_creation.errors import AlreadyExists
+from hairstyle_creation.errors import AlreadyExists, EmbeddingNotFinished
 from hairstyle_creation.models import (
     UploadPicture,
     Hairstyle,
@@ -75,11 +75,14 @@ def add_hairstyles(account_identifier: str, eventid: str, hairstyles_dict: list[
     event.hairstyles = hairstyles
     event.picked_hairstyles_timestamp = datetime.now()
     
-    write_data(event)
-    
     # Starts the blending inference if embedding has finished
     # If embedding has not finished then blending will start automatically when embedding is finished
-    start_blending_inference(event)
+    try:
+        start_blending_inference(event)
+    except EmbeddingNotFinished:
+        pass
+    finally:
+        write_data(event)
    
  
 def add_uploaded_picture(account_identifier: str, eventid: str, picture: dict[str, typing.Any]) -> Optional[Exception]:
@@ -105,10 +108,10 @@ def add_uploaded_picture(account_identifier: str, eventid: str, picture: dict[st
     event.uploaded_picture = UploadPicture(**picture)
     event.uploaded_picture_timestamp = datetime.now()
     
-    write_data(event)
-    
     # Starts the embedding event immediately the picture is uploaded to reduce customer waiting time
     start_embedding_inference(event)
+    
+    write_data(event)
     
 
 def get_results(account_identifier: str, eventid: str) -> list[BlendInferenceResult] | None:

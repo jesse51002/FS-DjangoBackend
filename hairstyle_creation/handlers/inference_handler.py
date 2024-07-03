@@ -2,7 +2,7 @@ from datetime import datetime
 import typing
 from typing import Optional
 
-from hairstyle_creation.errors import AlreadyExists
+from hairstyle_creation.errors import AlreadyExists, EmbeddingNotFinished
 from hairstyle_creation.models import (
     HairstyleChangeEvent,
     InferenceEvent,
@@ -46,7 +46,6 @@ def start_embedding_inference(event: HairstyleChangeEvent) -> Optional[Exception
     
     event.embedding_inference = inference_event
     add_to_embedding_queue(event)
-    write_data(event)
         
     
 def post_embed_result(result: dict[str, typing.Any]) -> None:
@@ -73,14 +72,15 @@ def post_embed_result(result: dict[str, typing.Any]) -> None:
         raise AlreadyExists("Embedding results have already been posted")
     
     event.embedding_inference.set_result(embedding_results)
-    write_data(event)
     
     try:
         # When embedding is finished trys to start blending
         # If embedding finished before user has picked hairstyles then user will start blending when they pick hairstyles
         start_blending_inference(event)
     except KeyError as e:
-        "Couldn't start blending inference because user hasnt picked hairstyles yet"
+        pass
+    finally:
+        write_data(event)
 
 
 def start_blending_inference(event: HairstyleChangeEvent) -> Optional[Exception]:
@@ -108,7 +108,7 @@ def start_blending_inference(event: HairstyleChangeEvent) -> Optional[Exception]
         raise ValueError("Embedding has not startet yet")
         
     if event.embedding_inference.result is None:
-        return Exception("Embedding has not finished yet")
+        raise EmbeddingNotFinished("Embedding has not finished yet")
     
     if event.blend_inferences is None:
         event.blend_inferences = []
@@ -130,7 +130,6 @@ def start_blending_inference(event: HairstyleChangeEvent) -> Optional[Exception]
         event.blend_inferences.append(inference_event)
     
     add_to_blending_queue(event)        
-    write_data(event)
     
 
 def post_blend_result(result: dict[str, typing.Any]):

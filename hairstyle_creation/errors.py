@@ -3,3 +3,6 @@ class UserError(Exception):
 
 class AlreadyExists(Exception):
     pass
+
+class EmbeddingNotFinished(Exception):
+    pass

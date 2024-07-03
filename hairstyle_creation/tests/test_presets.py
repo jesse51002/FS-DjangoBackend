@@ -16,6 +16,7 @@ hairstyle_invalid = {
     }
 
 
+
 picture_valid = {
         "file_location": "oihjasd",
         "bbox": (1, 2, 3, 4)
@@ -24,7 +25,6 @@ picture_invalid = {
         "file_location": "oihjasd",
         "rnadsopnfg": "oihasdiouh"
     }
-
 
 
 
@@ -38,6 +38,7 @@ blend_inference_result_valid = {
     "result_img_location": "asdsa",
     "errored": False
     }
+
 
 
 embedding_inference_valid = {

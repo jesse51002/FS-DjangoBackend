@@ -1,10 +1,9 @@
 from datetime import datetime
 
-from hairstyle_creation.errors import AlreadyExists
+from hairstyle_creation.errors import AlreadyExists, EmbeddingNotFinished
 from hairstyle_creation.models import (
     BlendInferenceResult,
     EmbeddingInferenceResult,
-    HairstyleChangeEvent,
     Hairstyle,
     UploadPicture,
     InferenceEvent,
@@ -154,16 +153,14 @@ class StartBlendingInferenceTest(TestCase):
         event = self.add_requirements()
         
         start_blending_inference(event=event)
-        
-        event = get_event(self.event_id, account_identifier=ACCOUNT_IDENTIFIER)  
-        
+                
         self.assertIsInstance(event.blend_inferences, list)
         for inference in event.blend_inferences:
             self.assertIsInstance(inference, InferenceEvent)
             self.assertIsInstance(inference.start_timestamp, datetime)
         
     def test_start_blending_inference_already_started(self):
-        """Tests embedding inference with an already started inference"""  
+        """Tests blending inference with an already started inference"""  
         event = self.add_requirements()
         event = get_event(self.event_id, account_identifier=ACCOUNT_IDENTIFIER)
         
@@ -179,12 +176,22 @@ class StartBlendingInferenceTest(TestCase):
         self.assertRaises(AlreadyExists, error_func)
         
     def test_start_blending_inference_no_hairstyles(self):
-        """Tests embedding inference with an already started inference"""  
+        """Tests embedding with no hairstyles"""  
         
         event = get_event(eventid=self.event_id, account_identifier=ACCOUNT_IDENTIFIER)
         def err_func():
             start_blending_inference(event)
         self.assertRaises(KeyError, err_func)
+        
+    def test_blending_inference_embeding_not_started(self):
+        """Tests embedding inference with an already started inference"""  
+        event = self.add_requirements()
+        event = get_event(eventid=self.event_id, account_identifier=ACCOUNT_IDENTIFIER)
+        event.embedding_inference.result = None
+        event.embedding_inference.finished_timestamp = None
+        def err_func():
+            start_blending_inference(event)
+        self.assertRaises(EmbeddingNotFinished, err_func)
 
 
 
